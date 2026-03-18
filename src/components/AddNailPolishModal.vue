@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="internalValue" max-width="500px" persistent>
     <v-card class="rounded-xl">
-      <v-card-title class="text-h5 bg-pink-lighten-5 text-pink-darken-4 font-weight-bold pa-5">
+      <v-card-title class="text-h5 bg-primary-lighten text-white font-weight-bold pa-5">
         <v-icon class="mr-2 pb-1">mdi-plus-circle</v-icon>
         Adicionar Novo Esmalte
       </v-card-title>
@@ -28,7 +28,7 @@
             label="Nome do Esmalte"
             variant="outlined"
             density="comfortable"
-            color="pink-darken-1"
+            color="primary"
             :rules="[v => !!v || 'Nome é obrigatório']"
             required
             class="mb-2"
@@ -39,7 +39,7 @@
             label="Marca"
             variant="outlined"
             density="comfortable"
-            color="pink-darken-1"
+            color="primary"
             class="mb-2"
           ></v-text-field>
 
@@ -48,7 +48,7 @@
             label="Cor / Tom"
             variant="outlined"
             density="comfortable"
-            color="pink-darken-1"
+            color="primary"
           ></v-text-field>
 
         </v-form>
@@ -58,16 +58,22 @@
 
       <v-card-actions class="pa-4 bg-grey-lighten-5">
         <v-spacer></v-spacer>
-        <v-btn color="grey-darken-2" variant="text" @click="close" rounded="pill" class="px-4 text-capitalize">
+        <v-btn color="grey-darken-2" variant="text" @click="close" rounded="pill" class="px-4 text-capitalize font-weight-medium">
           Cancelar
         </v-btn>
-        <v-btn color="pink-darken-1" variant="flat" :loading="loading" @click="save" rounded="pill" class="px-6 text-capitalize">
+        <v-btn color="primary" variant="flat" :loading="loading" @click="save" rounded="pill" class="px-6 text-capitalize font-weight-bold shadow-soft">
           Salvar
         </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 </template>
+
+<style scoped>
+.shadow-soft {
+  box-shadow: 0 4px 12px rgba(216, 27, 96, 0.3) !important;
+}
+</style>
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue';
