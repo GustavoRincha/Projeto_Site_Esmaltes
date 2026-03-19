@@ -1,7 +1,7 @@
 <template>
   <v-container class="px-md-8 py-md-8">
     
-    <div class="d-flex align-center justify-space-between mb-8 mt-4">
+    <div class="d-flex align-center justify-space-between mb-4 mt-4">
       <h1 class="text-h4 font-weight-bold text-primary-darken">Coleção</h1>
       <v-btn 
         color="primary" 
@@ -15,12 +15,35 @@
       </v-btn>
     </div>
 
+    <!-- Filtro de Busca -->
+    <v-row class="mb-6">
+      <v-col cols="12" sm="8" md="6" lg="5">
+        <v-text-field
+          v-model="searchQuery"
+          label="Buscar por nome ou cor..."
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          density="comfortable"
+          color="primary"
+          hide-details
+          clearable
+          bg-color="white"
+          class="rounded-lg shadow-sm"
+        ></v-text-field>
+      </v-col>
+    </v-row>
+
     <!-- Empty State -->
-    <v-row v-if="polishes.length === 0" justify="center" class="mt-12">
+    <v-row v-if="filteredPolishes.length === 0" justify="center" class="mt-6">
       <v-col cols="12" sm="8" md="6" class="text-center">
-        <v-icon size="80" color="grey-lighten-1" class="mb-4">mdi-flask-empty-outline</v-icon>
-        <h3 class="text-h6 text-grey-darken-1">Nenhum esmalte cadastrado.</h3>
-        <p class="text-body-1 text-grey">Clique em "Novo Esmalte" para começar sua coleção!</p>
+        <v-icon size="80" color="grey-lighten-1" class="mb-4">
+          {{ allPolishes.length === 0 ? 'mdi-flask-empty-outline' : 'mdi-magnify-remove-outline' }}
+        </v-icon>
+        <h3 class="text-h6 text-grey-darken-1">
+          {{ allPolishes.length === 0 ? 'Nenhum esmalte cadastrado.' : 'Nenhum esmalte encontrado.' }}
+        </h3>
+        <p class="text-body-1 text-grey" v-if="allPolishes.length === 0">Clique em "Novo Esmalte" para começar sua coleção!</p>
+        <p class="text-body-1 text-grey" v-else>Tente buscar por outro termo.</p>
       </v-col>
     </v-row>
 
@@ -84,6 +107,14 @@
     <AddNailPolishModal 
       v-model="isModalOpen" 
     />
+
+    <!-- Modal Confirmação de Exclusão -->
+    <ConfirmDeleteModal 
+      v-model="isDeleteDialogOpen"
+      title="Apagar Esmalte?"
+      text="Esta ação não pode ser desfeita. Tem certeza que deseja excluir?"
+      @confirm="executeDelete"
+    />
     
   </v-container>
 </template>
@@ -92,22 +123,36 @@
 import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import AddNailPolishModal from '../components/AddNailPolishModal.vue';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
 
 const store = useStore();
 const isModalOpen = ref(false);
 
-const polishes = computed(() => store.getters.allPolishes);
+const searchQuery = ref('');
+
+const allPolishes = computed(() => store.getters.allPolishes);
+
+const filteredPolishes = computed(() => {
+  const query = searchQuery.value.toLowerCase().trim();
+  if (!query) return allPolishes.value;
+  
+  return allPolishes.value.filter(p => {
+    const nameMatch = p.name?.toLowerCase().includes(query);
+    const colorMatch = p.color?.toLowerCase().includes(query);
+    return nameMatch || colorMatch;
+  });
+});
 
 // Lógica de Paginação
 const page = ref(1);
 const itemsPerPage = 8; // Defina o limite de esmaltes por página aqui
 
-const pageCount = computed(() => Math.ceil(polishes.value.length / itemsPerPage));
+const pageCount = computed(() => Math.ceil(filteredPolishes.value.length / itemsPerPage));
 
 const paginatedPolishes = computed(() => {
   const start = (page.value - 1) * itemsPerPage;
   const end = start + itemsPerPage;
-  return polishes.value.slice(start, end);
+  return filteredPolishes.value.slice(start, end);
 });
 
 // Reseta a página se a quantidade de páginas diminuir (ex: apagou o último item da página atual)
@@ -117,9 +162,18 @@ watch(pageCount, (newVal) => {
   }
 });
 
+const isDeleteDialogOpen = ref(false);
+const polishToDelete = ref(null);
+
 const deletePolish = (id) => {
-  if (confirm("Tem certeza que deseja apagar este esmalte?")) {
-    store.dispatch('deletePolish', id);
+  polishToDelete.value = id;
+  isDeleteDialogOpen.value = true;
+};
+
+const executeDelete = () => {
+  if (polishToDelete.value) {
+    store.dispatch('deletePolish', polishToDelete.value);
+    polishToDelete.value = null;
   }
 };
 </script>
@@ -135,5 +189,8 @@ const deletePolish = (id) => {
 }
 .shadow-soft {
   box-shadow: 0 8px 16px rgba(216, 27, 96, 0.25) !important;
+}
+.shadow-sm {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
 }
 </style>

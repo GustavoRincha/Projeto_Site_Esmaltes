@@ -21,6 +21,22 @@ const premiumTheme = {
   },
 }
 
+const premiumDark = {
+  dark: true,
+  colors: {
+    background: '#121212',
+    surface: '#1E1E1E',
+    primary: '#F48FB1', // lighter pink for dark mode readability
+    'primary-darken': '#FCE4EC', // almost white
+    'primary-lighten': '#D81B60', // bolder accent pink
+    secondary: '#BDBDBD',
+    error: '#CF6679',
+    info: '#2196F3',
+    success: '#4CAF50',
+    warning: '#FB8C00',
+  },
+}
+
 export default createVuetify({
   components,
   directives,
@@ -28,6 +44,7 @@ export default createVuetify({
     defaultTheme: 'premiumTheme',
     themes: {
       premiumTheme,
+      premiumDark,
     },
   },
   icons: {
