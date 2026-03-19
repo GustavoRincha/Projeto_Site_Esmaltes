@@ -39,10 +39,10 @@
             v-if="polish.image"
             :src="polish.image"
             height="220"
-            class="bg-grey-lighten-4"
+            class="bg-transparent"
           ></v-img>
           
-          <v-sheet v-else height="220" class="d-flex align-center justify-center bg-grey-lighten-4">
+          <v-sheet v-else height="220" class="d-flex align-center justify-center bg-transparent">
              <v-icon size="64" color="grey-lighten-2">mdi-image-off-outline</v-icon>
           </v-sheet>
 
