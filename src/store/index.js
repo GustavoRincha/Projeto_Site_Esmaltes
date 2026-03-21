@@ -55,17 +55,21 @@ const basePolishes = [
   { id: 'base-51', name: 'Terracota que provoca', brand: 'Risqué', color: '', image: '/Imagens/terracota que provoca - Risqué.png' },
   { id: 'base-52', name: 'Vanguarda', brand: 'Risqué', color: '', image: '/Imagens/vanguarda - Risqué.png' },
   { id: 'base-53', name: 'Verde safira', brand: 'colortrend (Avon)', color: '', image: '/Imagens/verde safira - colortrend (Avon).png' },
-  { id: 'base-54', name: 'É mais que um golpe', brand: 'Impala', color: '', image: '/Imagens/é mais que um golpe - Impala.png' },
+  { id: 'base-54', name: 'É mais que um golpe', brand: 'Impala', color: '', image: '/Imagens/é mais que um golpe - Impala.png' }
 ];
 
 export default createStore({
   state: {
+    user: null, // Sistema Supabase Auth
     nailPolishes: [],
     customPolishes: [],
     usages: [],
     wishlist: []
   },
   mutations: {
+    SET_USER(state, user) {
+      state.user = user;
+    },
     SET_CUSTOM_POLISHES(state, polishes) {
       state.customPolishes = polishes;
       state.nailPolishes = [...basePolishes, ...state.customPolishes];
@@ -104,30 +108,61 @@ export default createStore({
     }
   },
   actions: {
-    async loadFromStorage({ commit }) {
+    // ----------------------------------------
+    // SUPABASE AUTHENTICATION ACTIONS
+    // ----------------------------------------
+    async signUp({ commit }, { email, password }) {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+      return data;
+    },
+    async signIn({ commit }, { email, password }) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      commit('SET_USER', data.user);
+      return data;
+    },
+    async signOut({ commit }) {
+      await supabase.auth.signOut();
+      commit('SET_USER', null);
+      // Limpa dados privados ao deslogar
+      commit('SET_CUSTOM_POLISHES', []);
+      commit('SET_USAGES', []);
+      commit('SET_WISHLIST', []);
+    },
+
+    // ----------------------------------------
+    // DATABASE DATA ACTIONS
+    // ----------------------------------------
+    async loadFromStorage({ commit, state }) {
       if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('substitua')) {
         console.warn("Supabase não configurado no .env! Sem acesso aos dados.");
         return;
       }
+      if (!state.user) return; // Só carrega se tiver logado
       
       try {
-        const { data: polishes } = await supabase.from('polishes').select('*');
+        // Agora filtramos puxando exatamento os esmaltes deste usuário
+        const { data: polishes } = await supabase.from('polishes').select('*').eq('user_id', state.user.id);
         if (polishes) commit('SET_CUSTOM_POLISHES', polishes);
         
-        const { data: usages } = await supabase.from('usages').select('*').order('date', { ascending: false });
+        const { data: usages } = await supabase.from('usages').select('*').eq('user_id', state.user.id).order('date', { ascending: false });
         if (usages) commit('SET_USAGES', usages);
         
-        const { data: wList } = await supabase.from('wishlists').select('*').order('dateAdded', { ascending: false });
+        const { data: wList } = await supabase.from('wishlists').select('*').eq('user_id', state.user.id).order('dateAdded', { ascending: false });
         if (wList) commit('SET_WISHLIST', wList);
       } catch (err) {
         console.error("Erro carregando Supabase", err);
       }
     },
     
-    async addNailPolish({ commit }, { name, brand, color, finish, colorFamily, expirationDate, volume, imageFile }) {
+    async addNailPolish({ commit, state }, { name, brand, color, finish, colorFamily, expirationDate, volume, imageFile }) {
       return new Promise(async (resolve, reject) => {
+        if (!state.user) return reject('Usuário não autenticado');
+
         const payload = {
              id: Date.now().toString(),
+             user_id: state.user.id, // Vínculo Multi-usuário
              name,
              brand,
              color,
@@ -165,10 +200,13 @@ export default createStore({
       if (!error) commit('REMOVE_POLISH', id);
     },
 
-    async addUsage({ commit }, { polishIds, imageFile, notes, rating, usageType }) {
+    async addUsage({ commit, state }, { polishIds, imageFile, notes, rating, usageType }) {
       return new Promise(async (resolve, reject) => {
+        if (!state.user) return reject('Usuário não autenticado');
+
         const usageData = {
           id: Date.now().toString(),
+          user_id: state.user.id, // Vínculo Multi-usuário
           "polishIds": polishIds, 
           date: new Date().toISOString(),
           notes,
@@ -201,6 +239,8 @@ export default createStore({
 
     async updateUsage({ commit, state }, { id, polishIds, imageFile, notes, rating, usageType }) {
       return new Promise(async (resolve, reject) => {
+        if (!state.user) return reject('Usuário não logado');
+
         const existingUsage = state.usages.find(u => u.id === id);
         if (!existingUsage) return reject('Registro não encontrado');
 
@@ -244,9 +284,12 @@ export default createStore({
       if (!error) commit('REMOVE_USAGE', id);
     },
 
-    async addWishlistItem({ commit }, { name, brand, color }) {
+    async addWishlistItem({ commit, state }, { name, brand, color }) {
+      if (!state.user) return; // Prevent if not logged in
+
       const wishData = {
         id: Date.now().toString(),
+        user_id: state.user.id, // Vínculo Multi-usuário
         name,
         brand,
         color,
