@@ -12,6 +12,16 @@ const routes = [
     path: '/gallery',
     name: 'Gallery',
     component: UsagesGallery
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: () => import('../views/Dashboard.vue')
+  },
+  {
+    path: '/wishlist',
+    name: 'Wishlist',
+    component: () => import('../views/Wishlist.vue')
   }
 ];
 

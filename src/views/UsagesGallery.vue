@@ -8,7 +8,7 @@
         rounded="pill" 
         elevation="4"
         class="text-none font-weight-bold shadow-soft"
-        @click="isModalOpen = true"
+        @click="openNewModal"
       >
         Nova Foto
       </v-btn>
@@ -22,13 +22,17 @@
           <v-card-title class="bg-primary-lighten text-white font-weight-bold py-3 px-4">
             <v-icon left>mdi-history</v-icon> Último Utilizado
           </v-card-title>
-          <v-card-text class="pt-6 d-flex flex-column align-center text-center" v-if="lastUsed">
+          <v-card-text class="pt-6 d-flex flex-column align-center text-center" v-if="lastUsed && lastUsed.polishes">
             <v-avatar size="80" class="mb-3 bg-grey-lighten-3 elevation-2">
-              <v-img v-if="lastUsed.polish && lastUsed.polish.image" :src="lastUsed.polish.image" cover></v-img>
+              <v-img v-if="lastUsed.polishes.length > 0 && lastUsed.polishes[0].image" :src="lastUsed.polishes[0].image" cover></v-img>
               <v-icon v-else size="40" color="grey">mdi-bottle-tonic</v-icon>
             </v-avatar>
-            <div class="text-h6 font-weight-bold text-secondary">{{ lastUsed.polish ? lastUsed.polish.name : 'Apagado' }}</div>
-            <div class="text-body-2 text-grey-darken-1">{{ lastUsed.polish ? lastUsed.polish.brand : '' }}</div>
+            <div class="text-h6 font-weight-bold text-secondary">
+               {{ lastUsed.polishes.length > 0 ? lastUsed.polishes.map(p => p.name).join(' + ') : 'Apagado' }}
+            </div>
+            <div class="text-body-2 text-grey-darken-1">
+               {{ lastUsed.polishes.length > 0 ? lastUsed.polishes.map(p => p.brand).join(' / ') : '' }}
+            </div>
             <div class="text-caption mt-2 text-primary font-weight-bold">{{ formatDate(lastUsed.usageDate) }}</div>
           </v-card-text>
           <v-card-text class="pt-6 text-center text-grey" v-else>
@@ -92,8 +96,18 @@
           <v-card-text class="flex-grow-1 pt-4 pb-2">
              <div class="text-caption text-grey-darken-1 mb-1">{{ formatDate(usage.date) }}</div>
              <div class="text-body-1 font-weight-bold text-secondary mb-1">
-               Esmalte: {{ getPolishName(usage.polishId) }}
+               Esmaltes: {{ getPolishNames(usage) }}
              </div>
+             <v-rating
+               v-if="usage.rating"
+               :model-value="usage.rating"
+               readonly
+               color="amber"
+               density="compact"
+               size="small"
+               half-increments
+               class="mb-2"
+             ></v-rating>
              <p v-if="usage.notes" class="text-body-2 text-grey-darken-3 mt-2 font-italic border-s-sm pl-2">
                {{ usage.notes }}
              </p>
@@ -101,14 +115,15 @@
           
           <v-card-actions class="px-4 pb-4 pt-0">
             <v-spacer></v-spacer>
+            <v-btn color="primary" variant="text" icon="mdi-pencil" @click="editUsage(usage)"></v-btn>
             <v-btn color="error" variant="text" icon="mdi-delete" @click="deleteUsage(usage.id)"></v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
     </v-row>
 
-    <!-- Modal Adição -->
-    <AddUsageModal v-model="isModalOpen" />
+    <!-- Modal Adição/Edição -->
+    <AddUsageModal v-model="isModalOpen" :editData="usageToEdit" />
 
     <!-- Modal Confirmação de Exclusão -->
     <ConfirmDeleteModal 
@@ -129,6 +144,7 @@ import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
 
 const store = useStore();
 const isModalOpen = ref(false);
+const usageToEdit = ref(null);
 
 const usages = computed(() => store.getters.allUsages);
 const stats = computed(() => store.getters.usageStats);
@@ -139,9 +155,15 @@ const maxUses = computed(() => {
   return stats.value[0].count; // Already sorted
 });
 
-const getPolishName = (id) => {
-  const polish = store.getters.allPolishes.find(p => p.id === id);
-  return polish ? polish.name : 'Misterioso';
+const getPolishNames = (usage) => {
+  const ids = usage.polishIds && usage.polishIds.length > 0 
+    ? usage.polishIds 
+    : (usage.polishId ? [usage.polishId] : []);
+    
+  const polishes = ids.map(id => store.getters.allPolishes.find(p => p.id === id)).filter(Boolean);
+  if (polishes.length === 0) return 'Misterioso';
+  
+  return polishes.map(p => p.name).join(' + ');
 };
 
 const formatDate = (dateString) => {
@@ -150,6 +172,16 @@ const formatDate = (dateString) => {
 
 const isDeleteDialogOpen = ref(false);
 const usageToDelete = ref(null);
+
+const editUsage = (usage) => {
+  usageToEdit.value = usage;
+  isModalOpen.value = true;
+};
+
+const openNewModal = () => {
+  usageToEdit.value = null;
+  isModalOpen.value = true;
+};
 
 const deleteUsage = (id) => {
   usageToDelete.value = id;

@@ -2,8 +2,8 @@
   <v-dialog v-model="internalValue" max-width="500px" persistent>
     <v-card class="rounded-xl">
       <v-card-title class="text-h5 bg-primary-lighten text-white font-weight-bold pa-5">
-        <v-icon class="mr-2 pb-1">mdi-camera-plus</v-icon>
-        Registrar Resultado
+        <v-icon class="mr-2 pb-1">{{ editData ? 'mdi-pencil' : 'mdi-camera-plus' }}</v-icon>
+        {{ editData ? 'Editar Resultado' : 'Registrar Resultado' }}
       </v-card-title>
       
       <v-card-text class="pt-6">
@@ -27,17 +27,20 @@
           ></v-file-input>
 
           <v-autocomplete
-            v-model="fields.polishId"
+            v-model="fields.polishIds"
             :items="polishList"
             item-title="name"
             item-value="id"
-            label="Qual esmalte você usou?"
+            label="Quais esmaltes você usou?"
             variant="outlined"
             density="comfortable"
             color="primary"
-            :rules="[v => !!v || 'Você precisa selecionar um esmalte']"
+            :rules="[v => v && v.length > 0 || 'Você precisa selecionar pelo menos um esmalte']"
             required
             class="mb-2"
+            multiple
+            chips
+            closable-chips
             clearable
           >
             <template v-slot:item="{ props, item }">
@@ -60,7 +63,36 @@
             color="primary"
             rows="2"
             auto-grow
+            class="mb-2"
           ></v-textarea>
+
+          <div class="d-flex flex-column mb-2">
+            <span class="text-caption text-grey-darken-1 mb-1">Avaliação do Esmalte</span>
+            <v-rating
+              v-model="fields.rating"
+              hover
+              color="amber"
+              active-color="amber-darken-1"
+              half-increments
+              density="compact"
+              size="large"
+            ></v-rating>
+          </div>
+          
+          <div class="d-flex flex-column mb-0">
+            <span class="text-caption text-grey-darken-1 mb-1">Onde foi usado? (Para controle de consumo)</span>
+            <v-btn-toggle
+              v-model="fields.usageType"
+              color="primary"
+              variant="outlined"
+              mandatory
+              class="w-100 flex-wrap"
+            >
+              <v-btn value="hands" class="flex-grow-1 text-none">Nas Mãos</v-btn>
+              <v-btn value="feet" class="flex-grow-1 text-none">Nos Pés</v-btn>
+              <v-btn value="both" class="flex-grow-1 text-none">Ambos</v-btn>
+            </v-btn-toggle>
+          </div>
 
         </v-form>
       </v-card-text>
@@ -84,7 +116,13 @@
 import { ref, reactive, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 
-const props = defineProps(['modelValue']);
+const props = defineProps({
+  modelValue: Boolean,
+  editData: {
+    type: Object,
+    default: null
+  }
+});
 const emit = defineEmits(['update:modelValue']);
 const store = useStore();
 
@@ -102,8 +140,10 @@ const previewUrl = ref(null);
 const polishList = computed(() => store.getters.allPolishes);
 
 const fields = reactive({
-  polishId: null,
+  polishIds: [],
   notes: '',
+  rating: 0,
+  usageType: 'hands',
   file: null
 });
 
@@ -122,15 +162,34 @@ const onFileSelected = (event) => {
 };
 
 const resetForm = () => {
-  fields.polishId = null;
+  fields.polishIds = [];
   fields.notes = '';
+  fields.rating = 0;
+  fields.usageType = 'hands';
   fields.file = null;
   previewUrl.value = null;
   if (form.value) form.value.resetValidation();
 };
 
 watch(internalValue, (newVal) => {
-  if (newVal) resetForm();
+  if (newVal) {
+    if (props.editData && Object.keys(props.editData).length > 0) {
+      // Suporte para versão velha (polishId) e nova (polishIds)
+      const idsToSet = props.editData.polishIds && props.editData.polishIds.length > 0 
+        ? [...props.editData.polishIds] 
+        : (props.editData.polishId ? [props.editData.polishId] : []);
+        
+      fields.polishIds = idsToSet;
+      fields.notes = props.editData.notes || '';
+      fields.rating = props.editData.rating || 0;
+      fields.usageType = props.editData.usageType || 'hands';
+      fields.file = props.editData.photo ? 'keep' : null;
+      previewUrl.value = props.editData.photo || null;
+      if (form.value) form.value.resetValidation();
+    } else {
+      resetForm();
+    }
+  }
 });
 
 const close = () => {
@@ -143,11 +202,24 @@ const save = async () => {
   
   loading.value = true;
   try {
-    await store.dispatch('addUsage', {
-      polishId: fields.polishId,
-      notes: fields.notes,
-      imageFile: fields.file
-    });
+    if (props.editData && Object.keys(props.editData).length > 0) {
+      await store.dispatch('updateUsage', {
+        id: props.editData.id,
+        polishIds: fields.polishIds,
+        notes: fields.notes,
+        rating: fields.rating,
+        usageType: fields.usageType,
+        imageFile: fields.file
+      });
+    } else {
+      await store.dispatch('addUsage', {
+        polishIds: fields.polishIds,
+        notes: fields.notes,
+        rating: fields.rating,
+        usageType: fields.usageType,
+        imageFile: fields.file
+      });
+    }
     close();
   } catch (err) {
     console.error(err);

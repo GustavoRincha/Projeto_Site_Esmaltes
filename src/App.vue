@@ -21,7 +21,15 @@
       </v-btn>
       <v-btn to="/gallery" value="gallery">
         <v-icon>mdi-camera-party-mode</v-icon>
-        <span>Galeria</span>
+        <span>Inspirações</span>
+      </v-btn>
+      <v-btn to="/dashboard" value="dashboard">
+        <v-icon>mdi-chart-bar</v-icon>
+        <span>Painel</span>
+      </v-btn>
+      <v-btn to="/wishlist" value="wishlist">
+        <v-icon>mdi-heart</v-icon>
+        <span>Desejos</span>
       </v-btn>
     </v-bottom-navigation>
   </v-app>

@@ -45,11 +45,66 @@
 
           <v-text-field
             v-model="fields.color"
-            label="Cor / Tom"
+            label="Cor Principal (Ex: Vermelho Escuro)"
             variant="outlined"
             density="comfortable"
             color="primary"
+            class="mb-2"
           ></v-text-field>
+
+          <v-row class="mb-2 mt-0">
+            <v-col cols="12" sm="6" class="py-0">
+               <v-select
+                 v-model="fields.finish"
+                 :items="finishOptions"
+                 label="Acabamento"
+                 variant="outlined"
+                 density="comfortable"
+                 color="primary"
+                 clearable
+               ></v-select>
+            </v-col>
+            <v-col cols="12" sm="6" class="py-0">
+               <v-select
+                 v-model="fields.colorFamily"
+                 :items="colorFamilyOptions"
+                 label="Família de Cor"
+                 variant="outlined"
+                 density="comfortable"
+                 color="primary"
+                 clearable
+               ></v-select>
+            </v-col>
+          </v-row>
+
+          <v-divider class="mb-4 mt-2"></v-divider>
+          <div class="text-subtitle-2 text-grey-darken-1 font-weight-bold mb-3">Ciclo de Vida (Opcional)</div>
+          
+          <v-row class="mb-2">
+            <v-col cols="12" sm="6" class="py-0">
+               <v-text-field
+                 v-model="fields.expirationDate"
+                 label="Data de Validade"
+                 type="date"
+                 variant="outlined"
+                 density="comfortable"
+                 color="primary"
+                 clearable
+               ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6" class="py-0">
+               <v-text-field
+                 v-model="fields.volume"
+                 label="Volume Total"
+                 type="number"
+                 suffix="ml"
+                 variant="outlined"
+                 density="comfortable"
+                 color="primary"
+                 clearable
+               ></v-text-field>
+            </v-col>
+          </v-row>
 
         </v-form>
       </v-card-text>
@@ -98,8 +153,20 @@ const fields = reactive({
   name: '',
   brand: '',
   color: '',
+  finish: null,
+  colorFamily: null,
+  expirationDate: null,
+  volume: null,
   file: null
 });
+
+const finishOptions = [
+  'Cremoso', 'Cintilante', 'Fosco', 'Glitter', 'Metálico', 'Translúcido', 'Efeito Gel'
+];
+
+const colorFamilyOptions = [
+  'Tons de Vermelho/Rosa', 'Nudes/Marrons', 'Escuros/Pretos', 'Tons Frios (Azul/Verde)', 'Vibrantes/Neons', 'Claros/Brancos', 'Outros'
+];
 
 const triggerFileInput = () => {
   fileInput.value.$el.querySelector('input').click();
@@ -120,6 +187,10 @@ const resetForm = () => {
   fields.name = '';
   fields.brand = '';
   fields.color = '';
+  fields.finish = null;
+  fields.colorFamily = null;
+  fields.expirationDate = null;
+  fields.volume = null;
   fields.file = null;
   previewUrl.value = null;
   if (form.value) form.value.resetValidation();
@@ -144,6 +215,10 @@ const save = async () => {
       name: fields.name,
       brand: fields.brand,
       color: fields.color,
+      finish: fields.finish,
+      colorFamily: fields.colorFamily,
+      expirationDate: fields.expirationDate,
+      volume: fields.volume,
       imageFile: fields.file
     });
     close();

@@ -1,7 +1,5 @@
 import { createStore } from 'vuex';
-
-const STORAGE_KEY = 'nail-polish-catalog';
-const USAGES_STORAGE_KEY = 'nail-polish-usages';
+import { supabase } from '../supabase';
 
 const basePolishes = [
   { id: 'base-1', name: 'Gabriela', brand: 'Risqué', color: '', image: '/Imagens/Gabriela - Risqué.png' },
@@ -64,7 +62,8 @@ export default createStore({
   state: {
     nailPolishes: [],
     customPolishes: [],
-    usages: [] // { id, polishId, photo, date, notes }
+    usages: [],
+    wishlist: []
   },
   mutations: {
     SET_CUSTOM_POLISHES(state, polishes) {
@@ -74,137 +73,232 @@ export default createStore({
     ADD_POLISH(state, polish) {
       state.customPolishes.push(polish);
       state.nailPolishes = [...basePolishes, ...state.customPolishes];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.customPolishes));
     },
     REMOVE_POLISH(state, id) {
-      // Allow removing custom ones only
       state.customPolishes = state.customPolishes.filter(p => p.id !== id);
       state.nailPolishes = [...basePolishes, ...state.customPolishes];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.customPolishes));
     },
     SET_USAGES(state, usages) {
       state.usages = usages;
     },
     ADD_USAGE(state, usage) {
-      state.usages.unshift(usage); // Add to the beginning
-      localStorage.setItem(USAGES_STORAGE_KEY, JSON.stringify(state.usages));
+      state.usages.unshift(usage);
     },
     REMOVE_USAGE(state, id) {
       state.usages = state.usages.filter(u => u.id !== id);
-      localStorage.setItem(USAGES_STORAGE_KEY, JSON.stringify(state.usages));
+    },
+    UPDATE_USAGE(state, updatedUsage) {
+      const index = state.usages.findIndex(u => u.id === updatedUsage.id);
+      if (index !== -1) {
+        state.usages.splice(index, 1, updatedUsage);
+      }
+    },
+    SET_WISHLIST(state, items) {
+      state.wishlist = items;
+    },
+    ADD_WISHLIST(state, item) {
+      state.wishlist.unshift(item);
+    },
+    REMOVE_WISHLIST(state, id) {
+      state.wishlist = state.wishlist.filter(w => w.id !== id);
     }
   },
   actions: {
-    loadFromStorage({ commit }) {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          commit('SET_CUSTOM_POLISHES', parsed);
-        } catch (e) {
-          console.error("Erro ao ler do LocalStorage", e);
-          commit('SET_CUSTOM_POLISHES', []);
-        }
-      } else {
-        commit('SET_CUSTOM_POLISHES', []);
+    async loadFromStorage({ commit }) {
+      if (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL.includes('substitua')) {
+        console.warn("Supabase não configurado no .env! Sem acesso aos dados.");
+        return;
       }
       
-      const storedUsages = localStorage.getItem(USAGES_STORAGE_KEY);
-      if (storedUsages) {
-        try {
-          commit('SET_USAGES', JSON.parse(storedUsages));
-        } catch(e) {
-          commit('SET_USAGES', []);
-        }
+      try {
+        const { data: polishes } = await supabase.from('polishes').select('*');
+        if (polishes) commit('SET_CUSTOM_POLISHES', polishes);
+        
+        const { data: usages } = await supabase.from('usages').select('*').order('date', { ascending: false });
+        if (usages) commit('SET_USAGES', usages);
+        
+        const { data: wList } = await supabase.from('wishlists').select('*').order('dateAdded', { ascending: false });
+        if (wList) commit('SET_WISHLIST', wList);
+      } catch (err) {
+        console.error("Erro carregando Supabase", err);
       }
     },
     
-    // Converte arquivo para base64 e salva
-    async addNailPolish({ commit }, { name, brand, color, imageFile }) {
-      return new Promise((resolve, reject) => {
-        if (!imageFile) {
-          commit('ADD_POLISH', {
+    async addNailPolish({ commit }, { name, brand, color, finish, colorFamily, expirationDate, volume, imageFile }) {
+      return new Promise(async (resolve, reject) => {
+        const payload = {
              id: Date.now().toString(),
              name,
              brand,
              color,
+             finish: finish || null,
+             "colorFamily": colorFamily || null,
+             "expirationDate": expirationDate || null,
+             volume: volume ? parseFloat(volume) : null,
              image: null
-          });
-          resolve();
+        };
+
+        const executePush = async () => {
+           const { error } = await supabase.from('polishes').insert([payload]);
+           if (error) console.error("Database falhou", error);
+           commit('ADD_POLISH', payload);
+           resolve();
+        };
+
+        if (!imageFile) {
+          await executePush();
           return;
         }
 
         const reader = new FileReader();
         reader.readAsDataURL(imageFile);
-        reader.onload = () => {
-          commit('ADD_POLISH', {
-             id: Date.now().toString(),
-             name,
-             brand,
-             color,
-             image: reader.result // Base64
-          });
-          resolve();
+        reader.onload = async () => {
+          payload.image = reader.result; 
+          await executePush();
         };
         reader.onerror = (error) => reject(error);
       });
     },
 
-    deletePolish({ commit }, id) {
-      commit('REMOVE_POLISH', id);
+    async deletePolish({ commit }, id) {
+      const { error } = await supabase.from('polishes').delete().eq('id', id);
+      if (!error) commit('REMOVE_POLISH', id);
     },
 
-    async addUsage({ commit }, { polishId, imageFile, notes }) {
-      return new Promise((resolve, reject) => {
+    async addUsage({ commit }, { polishIds, imageFile, notes, rating, usageType }) {
+      return new Promise(async (resolve, reject) => {
         const usageData = {
           id: Date.now().toString(),
-          polishId,
+          "polishIds": polishIds, 
           date: new Date().toISOString(),
           notes,
+          rating: rating || 0,
+          "usageType": usageType || 'hands',
           photo: null
         };
 
+        const executePush = async () => {
+           const { error } = await supabase.from('usages').insert([usageData]);
+           if (error) console.error("Database falhou", error);
+           commit('ADD_USAGE', usageData);
+           resolve();
+        };
+
         if (!imageFile) {
-          commit('ADD_USAGE', usageData);
-          resolve();
+          await executePush();
           return;
         }
 
         const reader = new FileReader();
         reader.readAsDataURL(imageFile);
-        reader.onload = () => {
+        reader.onload = async () => {
           usageData.photo = reader.result;
-          commit('ADD_USAGE', usageData);
-          resolve();
+          await executePush();
         };
         reader.onerror = (error) => reject(error);
       });
     },
 
-    deleteUsage({ commit }, id) {
-      commit('REMOVE_USAGE', id);
+    async updateUsage({ commit, state }, { id, polishIds, imageFile, notes, rating, usageType }) {
+      return new Promise(async (resolve, reject) => {
+        const existingUsage = state.usages.find(u => u.id === id);
+        if (!existingUsage) return reject('Registro não encontrado');
+
+        const usageData = {
+          ...existingUsage,
+          "polishIds": polishIds, 
+          notes,
+          rating: rating || 0,
+          "usageType": usageType || 'hands'
+        };
+        delete usageData.polishId;
+
+        const executePush = async () => {
+           const { error } = await supabase.from('usages').update(usageData).eq('id', id);
+           if (error) console.error("Database falhou", error);
+           commit('UPDATE_USAGE', usageData);
+           resolve();
+        };
+
+        if (imageFile === 'keep') {
+           await executePush();
+           return;
+        } else if (!imageFile) {
+           usageData.photo = null;
+           await executePush();
+           return;
+        }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(imageFile);
+        reader.onload = async () => {
+          usageData.photo = reader.result;
+          await executePush();
+        };
+        reader.onerror = (error) => reject(error);
+      });
+    },
+
+    async deleteUsage({ commit }, id) {
+      const { error } = await supabase.from('usages').delete().eq('id', id);
+      if (!error) commit('REMOVE_USAGE', id);
+    },
+
+    async addWishlistItem({ commit }, { name, brand, color }) {
+      const wishData = {
+        id: Date.now().toString(),
+        name,
+        brand,
+        color,
+        "dateAdded": new Date().toISOString()
+      };
+      
+      const { error } = await supabase.from('wishlists').insert([wishData]);
+      if (!error) commit('ADD_WISHLIST', wishData);
+      else console.error(error);
+    },
+
+    async removeWishlistItem({ commit }, id) {
+      const { error } = await supabase.from('wishlists').delete().eq('id', id);
+      if (!error) commit('REMOVE_WISHLIST', id);
     }
   },
   getters: {
     allPolishes: (state) => state.nailPolishes,
     allUsages: (state) => state.usages,
+    wishlistItems: (state) => state.wishlist,
     
-    // Calcula quantos usos cada esmalte teve
+    // Calcula quantos usos cada esmalte teve e a média de avaliação
     usageStats: (state) => {
       const stats = {};
       state.usages.forEach(usage => {
-        if (!stats[usage.polishId]) {
-          stats[usage.polishId] = 0;
-        }
-        stats[usage.polishId]++;
+        // Suporta registros velhos que tinham apenas 'polishId' ou novos com 'polishIds'
+        const ids = usage.polishIds && usage.polishIds.length > 0 
+          ? usage.polishIds 
+          : (usage.polishId ? [usage.polishId] : []);
+          
+        ids.forEach(id => {
+          if (!stats[id]) {
+            stats[id] = { count: 0, totalRating: 0, ratingCount: 0 };
+          }
+          stats[id].count++;
+          if (usage.rating > 0) {
+            stats[id].totalRating += usage.rating;
+            stats[id].ratingCount++;
+          }
+        });
       });
 
       // Retorna array ordenado do mais usado para o menos
       return Object.keys(stats).map(polishId => {
         const polish = state.nailPolishes.find(p => p.id === polishId);
+        const st = stats[polishId];
+        const averageRating = st.ratingCount > 0 ? (st.totalRating / st.ratingCount) : 0;
+        
         return {
           polishId,
-          count: stats[polishId],
+          count: st.count,
+          averageRating: parseFloat(averageRating.toFixed(1)),
           polishName: polish ? polish.name : 'Desconhecido',
           polishBrand: polish ? polish.brand : '',
           polishColor: polish ? polish.color : '',
@@ -213,15 +307,79 @@ export default createStore({
       }).sort((a, b) => b.count - a.count);
     },
 
-    // Retorna o esmalte cadastrado na utilidade mais recente
+    getPolishRating: (state, getters) => (id) => {
+      const stat = getters.usageStats.find(s => s.polishId === id);
+      return stat ? stat.averageRating : 0;
+    },
+
+    // Retorna os esmaltes cadastrados na utilidade mais recente
     lastUsedPolish: (state, getters) => {
       if (state.usages.length === 0) return null;
       const latestUsage = state.usages[0]; // Como é unshift, o índice 0 é o mais recente
-      const polish = state.nailPolishes.find(p => p.id === latestUsage.polishId);
+      
+      const IDs = latestUsage.polishIds && latestUsage.polishIds.length > 0 
+          ? latestUsage.polishIds 
+          : (latestUsage.polishId ? [latestUsage.polishId] : []);
+          
+      const polishes = IDs.map(id => state.nailPolishes.find(p => p.id === id)).filter(Boolean);
+      
       return {
         usageDate: latestUsage.date,
-        polish
+        polishes
       };
+    },
+
+    polishMetrics: (state) => (polishId) => {
+      const polish = state.nailPolishes.find(p => p.id === polishId);
+      if (!polish) return null;
+
+      const metrics = {
+        isExpired: false,
+        expiresSoon: false,
+        daysToExpiration: null,
+        totalVolume: polish.volume || 0,
+        consumedVolume: 0,
+        remainingVolume: polish.volume || 0,
+        volumePercentage: 100
+      };
+
+      if (polish.expirationDate) {
+        const today = new Date();
+        const expDate = new Date(polish.expirationDate);
+        today.setHours(0,0,0,0);
+        expDate.setHours(0,0,0,0);
+
+        const diffTime = expDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        metrics.daysToExpiration = diffDays;
+        if (diffDays < 0) {
+          metrics.isExpired = true;
+        } else if (diffDays <= 30) {
+          metrics.expiresSoon = true;
+        }
+      }
+
+      if (metrics.totalVolume > 0) {
+        const uses = state.usages.filter(u => {
+           const ids = u.polishIds && u.polishIds.length > 0 ? u.polishIds : (u.polishId ? [u.polishId] : []);
+           return ids.includes(polishId);
+        });
+
+        uses.forEach(u => {
+          let consumption = 0;
+          if (u.usageType === 'feet') consumption = 0.25;
+          else if (u.usageType === 'both') consumption = 0.65;
+          else consumption = 0.40;
+          
+          metrics.consumedVolume += consumption;
+        });
+
+        metrics.remainingVolume = Math.max(0, metrics.totalVolume - metrics.consumedVolume);
+        metrics.volumePercentage = Math.round((metrics.remainingVolume / metrics.totalVolume) * 100);
+      }
+
+      return metrics;
     }
   }
 });
