@@ -1,7 +1,7 @@
 <template>
   <v-app>
     <v-app-bar color="surface" density="comfortable" elevation="1" :class="isDark ? 'border-b-0' : 'border-b'">
-      <v-app-bar-title class="font-weight-bold text-primary-darken">Meus Esmaltes <span class="text-primary-lighten">💅</span></v-app-bar-title>
+      <v-app-bar-title class="font-weight-bold text-primary-darken">NailVibe <span class="text-primary-lighten">💅</span></v-app-bar-title>
       <v-spacer></v-spacer>
 
       <!-- Logout Component -->

@@ -30,11 +30,41 @@
 
           <v-text-field
             v-model="fields.color"
-            label="Cor / Tom (Opcional)"
+            label="Nome da Cor (Opcional)"
             variant="outlined"
             density="comfortable"
             color="secondary"
+            class="mb-2"
           ></v-text-field>
+
+          <v-menu v-model="colorMenu" :close-on-content-click="false" location="bottom">
+            <template v-slot:activator="{ props }">
+               <v-text-field
+                 v-model="fields.hexColor"
+                 v-bind="props"
+                 label="Tom Visual Exato (Opcional)"
+                 variant="outlined"
+                 density="comfortable"
+                 color="secondary"
+                 prepend-inner-icon="mdi-palette-swatch"
+                 readonly
+                 clearable
+               >
+                 <template v-slot:append>
+                    <v-avatar :color="fields.hexColor || 'transparent'" size="30" class="border"></v-avatar>
+                 </template>
+               </v-text-field>
+            </template>
+            <v-card>
+               <v-card-text class="pa-0">
+                  <v-color-picker v-model="fields.hexColor" mode="hex" hide-inputs elevation="0"></v-color-picker>
+               </v-card-text>
+               <v-card-actions>
+                 <v-spacer></v-spacer>
+                 <v-btn color="secondary" variant="text" @click="colorMenu = false">Ok</v-btn>
+               </v-card-actions>
+            </v-card>
+          </v-menu>
         </v-form>
       </v-card-text>
 
@@ -69,17 +99,21 @@ const internalValue = computed({
 const valid = ref(false);
 const form = ref(null);
 const loading = ref(false);
+const colorMenu = ref(false);
 
 const fields = reactive({
   name: '',
   brand: '',
-  color: ''
+  color: '',
+  hexColor: null
 });
 
 const resetForm = () => {
   fields.name = '';
   fields.brand = '';
   fields.color = '';
+  fields.hexColor = null;
+  colorMenu.value = false;
   if (form.value) form.value.resetValidation();
 };
 
@@ -100,7 +134,8 @@ const save = async () => {
     await store.dispatch('addWishlistItem', {
       name: fields.name,
       brand: fields.brand,
-      color: fields.color
+      color: fields.color,
+      hexColor: fields.hexColor
     });
     close();
   } catch (err) {

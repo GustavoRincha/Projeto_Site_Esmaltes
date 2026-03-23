@@ -111,13 +111,38 @@ export default createStore({
     // ----------------------------------------
     // SUPABASE AUTHENTICATION ACTIONS
     // ----------------------------------------
-    async signUp({ commit }, { email, password }) {
+    async signUp({ commit }, { email, password, username }) {
+      // 1. Verificar se usuário existe para não criar uma Auth quebrada
+      const { data: existingUser } = await supabase.from('profiles').select('username').eq('username', username).maybeSingle();
+      if (existingUser) throw new Error('Nome de usuário indisponível');
+
+      // 2. Criar a sessão no Supabase Auth
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
+      
+      // 3. Cadastrar a ponte Perfil -> E-mail na tabela
+      if (data.user) {
+         const { error: profileError } = await supabase.from('profiles').insert({
+            id: data.user.id,
+            username: username,
+            email: email
+         });
+         // Ignorar erros caso RLS reclame locamente ou dar fallback limpo
+         if (profileError) console.error("Erro salvando profile:", profileError);
+      }
       return data;
     },
-    async signIn({ commit }, { email, password }) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    async signIn({ commit }, { identifier, password }) {
+      let loginEmail = identifier;
+      
+      // Se não tem '@', deduzimos que é uma tentativa de Login via Username
+      if (!identifier.includes('@')) {
+         const { data: profile } = await supabase.from('profiles').select('email').eq('username', identifier).maybeSingle();
+         if (!profile) throw new Error('Usuário não encontrado');
+         loginEmail = profile.email; // Tradução de Username para Email
+      }
+      
+      const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
       if (error) throw error;
       commit('SET_USER', data.user);
       return data;
@@ -156,16 +181,17 @@ export default createStore({
       }
     },
     
-    async addNailPolish({ commit, state }, { name, brand, color, finish, colorFamily, expirationDate, volume, imageFile }) {
+    async addNailPolish({ commit, state }, { name, brand, color, hexColor, finish, colorFamily, expirationDate, volume, imageFile }) {
       return new Promise(async (resolve, reject) => {
         if (!state.user) return reject('Usuário não autenticado');
 
         const payload = {
              id: Date.now().toString(),
-             user_id: state.user.id, // Vínculo Multi-usuário
+             user_id: state.user.id,
              name,
              brand,
              color,
+             "hexColor": hexColor || null,
              finish: finish || null,
              "colorFamily": colorFamily || null,
              "expirationDate": expirationDate || null,
@@ -284,7 +310,7 @@ export default createStore({
       if (!error) commit('REMOVE_USAGE', id);
     },
 
-    async addWishlistItem({ commit, state }, { name, brand, color }) {
+    async addWishlistItem({ commit, state }, { name, brand, color, hexColor }) {
       if (!state.user) return; // Prevent if not logged in
 
       const wishData = {
@@ -293,6 +319,7 @@ export default createStore({
         name,
         brand,
         color,
+        "hexColor": hexColor || null,
         "dateAdded": new Date().toISOString()
       };
       

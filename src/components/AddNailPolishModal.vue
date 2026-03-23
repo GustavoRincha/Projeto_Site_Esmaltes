@@ -45,12 +45,42 @@
 
           <v-text-field
             v-model="fields.color"
-            label="Cor Principal (Ex: Vermelho Escuro)"
+            label="Nome da Cor (Ex: Vermelho Escuro)"
             variant="outlined"
             density="comfortable"
             color="primary"
             class="mb-2"
           ></v-text-field>
+
+          <v-menu v-model="colorMenu" :close-on-content-click="false" location="bottom">
+            <template v-slot:activator="{ props }">
+               <v-text-field
+                 v-model="fields.hexColor"
+                 v-bind="props"
+                 label="Tom Visual Exato (Opcional)"
+                 variant="outlined"
+                 density="comfortable"
+                 color="primary"
+                 prepend-inner-icon="mdi-palette-swatch"
+                 readonly
+                 class="mb-2"
+                 clearable
+               >
+                 <template v-slot:append>
+                    <v-avatar :color="fields.hexColor || 'transparent'" size="30" class="border"></v-avatar>
+                 </template>
+               </v-text-field>
+            </template>
+            <v-card>
+               <v-card-text class="pa-0">
+                  <v-color-picker v-model="fields.hexColor" mode="hex" hide-inputs elevation="0"></v-color-picker>
+               </v-card-text>
+               <v-card-actions>
+                 <v-spacer></v-spacer>
+                 <v-btn color="primary" variant="text" @click="colorMenu = false">Pronto</v-btn>
+               </v-card-actions>
+            </v-card>
+          </v-menu>
 
           <v-row class="mb-2 mt-0">
             <v-col cols="12" sm="6" class="py-0">
@@ -148,11 +178,13 @@ const form = ref(null);
 const fileInput = ref(null);
 const loading = ref(false);
 const previewUrl = ref(null);
+const colorMenu = ref(false);
 
 const fields = reactive({
   name: '',
   brand: '',
   color: '',
+  hexColor: null,
   finish: null,
   colorFamily: null,
   expirationDate: null,
@@ -187,12 +219,14 @@ const resetForm = () => {
   fields.name = '';
   fields.brand = '';
   fields.color = '';
+  fields.hexColor = null;
   fields.finish = null;
   fields.colorFamily = null;
   fields.expirationDate = null;
   fields.volume = null;
   fields.file = null;
   previewUrl.value = null;
+  colorMenu.value = false;
   if (form.value) form.value.resetValidation();
 };
 
@@ -215,6 +249,7 @@ const save = async () => {
       name: fields.name,
       brand: fields.brand,
       color: fields.color,
+      hexColor: fields.hexColor,
       finish: fields.finish,
       colorFamily: fields.colorFamily,
       expirationDate: fields.expirationDate,

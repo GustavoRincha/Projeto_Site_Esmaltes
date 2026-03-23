@@ -107,8 +107,8 @@
             class="bg-transparent"
           ></v-img>
           
-          <v-sheet v-else height="220" class="d-flex align-center justify-center bg-transparent">
-             <v-icon size="64" color="grey-lighten-2">mdi-image-off-outline</v-icon>
+          <v-sheet v-else height="220" :color="polish.hexColor || 'transparent'" class="d-flex align-center justify-center">
+             <v-icon size="64" :color="polish.hexColor ? 'white' : 'grey-lighten-2'">{{ polish.hexColor ? 'mdi-water' : 'mdi-image-off-outline' }}</v-icon>
           </v-sheet>
 
           <v-card-text class="flex-grow-1 pt-4 pb-2">
@@ -181,8 +181,9 @@
         :length="pageCount"
         color="primary"
         rounded="circle"
-        :total-visible="5"
+        :total-visible="3"
         elevation="2"
+        size="small"
       ></v-pagination>
     </v-row>
 

@@ -47,7 +47,9 @@
           </div>
           
           <v-card-text class="flex-grow-1 pt-6 pb-2 text-center d-flex flex-column align-center justify-center">
-            <v-icon size="48" color="secondary-lighten-2" class="mb-3">mdi-bottle-tonic-outline</v-icon>
+            <v-avatar :color="item.hexColor || 'transparent'" size="64" class="mb-3">
+              <v-icon size="48" :color="item.hexColor ? 'white' : 'secondary-lighten-2'">mdi-bottle-tonic-outline</v-icon>
+            </v-avatar>
             <div class="text-overline mb-0 text-primary">{{ item.brand || 'Sem marca' }}</div>
             <div class="text-h6 font-weight-bold text-secondary mb-2">{{ item.name }}</div>
             
@@ -123,6 +125,7 @@ const buyItem = async (item) => {
       name: item.name,
       brand: item.brand,
       color: item.color,
+      hexColor: item.hexColor,
       finish: null,
       colorFamily: null,
       imageFile: null
